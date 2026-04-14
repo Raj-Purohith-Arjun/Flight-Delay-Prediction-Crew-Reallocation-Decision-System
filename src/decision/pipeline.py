@@ -162,11 +162,14 @@ def run_reallocation_and_simulation(top_n_flights: int = 5) -> list[dict]:
         if eligible.empty:
             outputs.append({"flight_id": flight["flight_id"], "escalation": "No eligible crew available"})
             continue
-        scored = score_crew_candidates(eligible, flight, cfg_realloc["cost_weights"])
+        flight_for_scoring = flight.copy()
+        flight_for_scoring["max_fdp_hours"] = float(cfg_realloc["constraints"]["max_fdp_hours"])
+        flight_for_scoring["min_rest_hours"] = float(cfg_realloc["constraints"]["min_rest_hours"])
+        scored = score_crew_candidates(eligible, flight_for_scoring, cfg_realloc["cost_weights"])
         topk = top_k_recommendations(scored, k=3)
 
         base_delay = float(max(0.0, flight.get("arr_delay_min", 20)))
-        reduced_delay = float(max(0.0, base_delay * 0.82))
+        reduced_delay = float(max(0.0, base_delay * float(cfg_realloc["simulation"]["intervention_delay_factor"])))
         sim_cfg = {
             "iterations": int(cfg_realloc["simulation"]["iterations"]),
             "carry_over_factor": float(cfg_realloc["simulation"]["carry_over_factor"]),

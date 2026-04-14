@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 
+QUALIFICATION_EQUIVALENCE = {
+    "A320": {"A320"},
+    "B737": {"B737"},
+    "B777": {"B777"},
+}
+
+
 def has_qualification(crew_quals: str, aircraft_type: str) -> bool:
     quals = set(filter(None, (q.strip() for q in crew_quals.split(","))))
-    return aircraft_type in quals or ("B777" in quals and aircraft_type in {"A320", "B737"})
+    required = QUALIFICATION_EQUIVALENCE.get(aircraft_type, {aircraft_type})
+    return bool(quals.intersection(required))
 
 
 def meets_rest(rest_hours: float, min_rest_hours: float) -> bool:
