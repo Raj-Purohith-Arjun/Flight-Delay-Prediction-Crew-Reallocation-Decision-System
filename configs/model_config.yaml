@@ -1,0 +1,28 @@
+lightgbm:
+  objective: binary
+  metric: auc
+  learning_rate: 0.05
+  num_leaves: 31
+  feature_fraction: 0.9
+  bagging_fraction: 0.8
+  bagging_freq: 1
+  min_data_in_leaf: 40
+  n_estimators: 300
+  random_state: 42
+
+target_recall: 0.75
+categorical_features:
+  - carrier
+  - origin
+  - destination
+  - route_type
+numerical_features:
+  - distance_miles
+  - demand_capacity_ratio
+  - weather_severity
+  - weather_worsening_3h
+  - turnaround_pressure
+  - prev_day_origin_delay_rate
+  - rolling_7d_origin_delay_rate
+  - rolling_30d_route_delay_rate
+  - gdp_flag
