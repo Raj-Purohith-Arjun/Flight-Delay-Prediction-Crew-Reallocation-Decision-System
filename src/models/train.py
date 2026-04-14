@@ -20,13 +20,23 @@ class TrainOutput:
     feature_columns: list[str]
 
 
-def train_lightgbm(df: pd.DataFrame, feature_columns: list[str], categorical_cols: list[str], params: dict, target_recall: float) -> TrainOutput:
+def train_lightgbm(
+    df: pd.DataFrame,
+    feature_columns: list[str],
+    categorical_cols: list[str],
+    params: dict,
+    target_recall: float,
+    category_levels: dict[str, list[str]] | None = None,
+) -> TrainOutput:
     data = df.copy()
     X = data[feature_columns].copy()
     y = data["is_delayed"].astype(int)
 
     for col in categorical_cols:
-        X[col] = X[col].astype("category")
+        if category_levels and col in category_levels:
+            X[col] = pd.Categorical(X[col].astype(str), categories=category_levels[col])
+        else:
+            X[col] = X[col].astype("category")
 
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     oof = np.zeros(len(data))

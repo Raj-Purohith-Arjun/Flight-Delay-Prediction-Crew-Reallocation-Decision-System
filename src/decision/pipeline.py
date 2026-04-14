@@ -30,6 +30,22 @@ ARTIFACT_META = DATA_PROCESSED / "model_meta.pkl"
 ARTIFACT_FEATURES = DATA_PROCESSED / "features.parquet"
 
 
+def _prepare_model_input(
+    df: pd.DataFrame,
+    feature_columns: list[str],
+    categorical_columns: list[str],
+    category_levels: dict[str, list[str]] | None = None,
+) -> pd.DataFrame:
+    X = df[feature_columns].copy()
+    for col in categorical_columns:
+        levels = (category_levels or {}).get(col)
+        if levels is not None:
+            X[col] = pd.Categorical(X[col].astype(str), categories=levels)
+        else:
+            X[col] = X[col].astype("category")
+    return X
+
+
 def build_dataset() -> pd.DataFrame:
     ensure_dirs()
     flights = generate_flights()
@@ -46,6 +62,7 @@ def train_models() -> dict:
     cfg = load_yaml(CONFIG_DIR / "model_config.yaml")
     data = pd.read_parquet(ARTIFACT_FEATURES)
     feature_columns = cfg["categorical_features"] + cfg["numerical_features"]
+    category_levels = {col: sorted(data[col].astype(str).unique().tolist()) for col in cfg["categorical_features"]}
 
     train_output = train_lightgbm(
         df=data,
@@ -53,6 +70,7 @@ def train_models() -> dict:
         categorical_cols=cfg["categorical_features"],
         params=cfg["lightgbm"],
         target_recall=float(cfg["target_recall"]),
+        category_levels=category_levels,
     )
 
     split = int(len(data) * 0.8)
@@ -76,6 +94,7 @@ def train_models() -> dict:
                 "threshold_precision": train_output.threshold_precision,
                 "threshold_recall": train_output.threshold_recall,
                 "baseline": baseline,
+                "category_levels": category_levels,
             },
             handle,
         )
@@ -95,9 +114,13 @@ def evaluate_model() -> dict:
         meta = pickle.load(handle)
 
     data = pd.read_parquet(ARTIFACT_FEATURES)
-    X = data[meta["feature_columns"]].copy()
-    for col in [c for c in meta["feature_columns"] if X[c].dtype == "object"]:
-        X[col] = X[col].astype("category")
+    cfg_model = load_yaml(CONFIG_DIR / "model_config.yaml")
+    X = _prepare_model_input(
+        data,
+        meta["feature_columns"],
+        cfg_model["categorical_features"],
+        meta.get("category_levels"),
+    )
 
     prob_matrix = np.column_stack([m.predict_proba(X)[:, 1] for m in models])
     y_score = prob_matrix.mean(axis=1)
@@ -123,9 +146,12 @@ def run_reallocation_and_simulation(top_n_flights: int = 5) -> list[dict]:
     lookahead_end = data["departure_ts"].min() + pd.Timedelta(hours=3)
     window = data[data["departure_ts"] <= lookahead_end].copy()
 
-    X = window[meta["feature_columns"]].copy()
-    for col in cfg_model["categorical_features"]:
-        X[col] = X[col].astype("category")
+    X = _prepare_model_input(
+        window,
+        meta["feature_columns"],
+        cfg_model["categorical_features"],
+        meta.get("category_levels"),
+    )
     risk = np.column_stack([m.predict_proba(X)[:, 1] for m in models]).mean(axis=1)
     window["risk_score"] = risk
     flagged = window[window["risk_score"] >= float(meta["threshold"])].sort_values(["risk_score", "departure_ts"], ascending=[False, True]).head(top_n_flights)
