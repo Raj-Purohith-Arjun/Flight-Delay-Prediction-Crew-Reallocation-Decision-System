@@ -1,0 +1,17 @@
+constraints:
+  min_rest_hours: 10
+  max_fdp_hours: 9
+  max_7day_hours: 60
+  max_28day_hours: 190
+
+cost_weights:
+  reserve_bonus: -15
+  deadhead_cost_per_hub_hop: 25
+  downstream_disruption: 35
+  duty_cushion_penalty: 20
+
+simulation:
+  iterations: 500
+  carry_over_factor: 0.65
+  noise_low: -0.1
+  noise_high: 0.1
